@@ -1,0 +1,39 @@
+from typing import cast
+
+from fastapi import HTTPException
+from pydantic import EmailStr
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import UserModel, UserGroupModel, UserGroupEnum
+from schemas import UserRegistrationRequestSchema
+from security.passwords import hash_password
+
+
+async def create_user(user: UserRegistrationRequestSchema, db: AsyncSession):
+    try:
+        result = await db.execute(
+            select(UserGroupModel.id)
+            .where(UserGroupModel.name == UserGroupEnum.USER)
+        )
+        default_group_id = result.scalar_one_or_none()
+
+        hashed = hash_password(user.password)
+        db_user = UserModel(
+            email=cast(str, user.email),
+            _hashed_password=hashed,
+            group_id=default_group_id,
+        )
+        db.add(db_user)
+        await db.commit()
+        await db.refresh(db_user)
+        return db_user
+
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="An error occurred during user creation.")
+
+
+async def get_user_by_email(email: EmailStr, db: AsyncSession):
+    result = await db.execute(select(UserModel).where(UserModel.email == email))
+    return result.scalar_one_or_none()
