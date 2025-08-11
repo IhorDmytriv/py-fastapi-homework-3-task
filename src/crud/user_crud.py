@@ -40,8 +40,6 @@ async def create_user(user: UserRegistrationRequestSchema, db: AsyncSession):
 
 
 async def get_user_by_email(email: EmailStr, db: AsyncSession):
-    result = await db.execute(select(UserModel).where(UserModel.email == email))
-    return result.scalar_one_or_none()
     result = await db.execute(
         select(UserModel)
         .options(
