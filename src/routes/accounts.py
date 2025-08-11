@@ -24,7 +24,7 @@ from schemas import (
     UserRegistrationRequestSchema,
     UserActivationRequestSchema,
     MessageResponseSchema,
-    UserBaseSchema
+    PasswordResetRequestSchema
 )
 from security.interfaces import JWTAuthManagerInterface
 
@@ -65,7 +65,7 @@ async def activate_account(activation_data: UserActivationRequestSchema, db: Asy
 
 
 @router.post("/password-reset/request/", status_code=200, response_model=MessageResponseSchema)
-async def password_reset_request(user_data: UserBaseSchema, db: AsyncSession = Depends(get_db)):
+async def password_reset_request(user_data: PasswordResetRequestSchema, db: AsyncSession = Depends(get_db)):
     db_user = await get_user_by_email(email=user_data.email, db=db)
 
     return await reset_request_user_password(user=db_user, db=db)
