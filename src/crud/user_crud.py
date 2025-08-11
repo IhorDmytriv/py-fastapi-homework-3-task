@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from pydantic import EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from database import UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel
 from schemas import UserRegistrationRequestSchema
@@ -41,3 +42,22 @@ async def create_user(user: UserRegistrationRequestSchema, db: AsyncSession):
 async def get_user_by_email(email: EmailStr, db: AsyncSession):
     result = await db.execute(select(UserModel).where(UserModel.email == email))
     return result.scalar_one_or_none()
+    result = await db.execute(
+        select(UserModel)
+        .options(
+            joinedload(UserModel.activation_token),
+        )
+        .where(UserModel.email == email)
+    )
+    return result.unique().scalar_one_or_none()
+
+
+async def activate_user(user: UserModel, activation_token: str, db: AsyncSession) -> dict:
+    user_token_model = user.activation_token
+    if user_token_model.token != activation_token:
+        raise HTTPException(status_code=401)
+
+    user.is_active = True
+    await db.delete(user_token_model)
+    await db.commit()
+    return {"message": "User account activated successfully."}

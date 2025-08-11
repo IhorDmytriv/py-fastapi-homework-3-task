@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, joinedload
 
 from config import get_jwt_auth_manager, get_settings, BaseAppSettings
-from crud.user_crud import create_user, get_user_by_email
+from crud.user_crud import create_user, get_user_by_email, activate_user
 from database import (
     get_db,
     UserModel,
@@ -19,7 +19,12 @@ from database import (
     RefreshTokenModel
 )
 from exceptions import BaseSecurityError
-from schemas import UserRegistrationResponseSchema, UserRegistrationRequestSchema
+from schemas import (
+    UserRegistrationResponseSchema,
+    UserRegistrationRequestSchema,
+    UserActivationRequestSchema,
+    MessageResponseSchema
+)
 from security.interfaces import JWTAuthManagerInterface
 
 router = APIRouter()
@@ -40,3 +45,19 @@ async def register_user(user_data: UserRegistrationRequestSchema, db: AsyncSessi
 
     new_user = await create_user(user=user_data, db=db)
     return new_user
+
+
+@router.post("/activate/", status_code=200, response_model=MessageResponseSchema)
+async def activate_account(activation_data: UserActivationRequestSchema, db: AsyncSession = Depends(get_db)):
+    db_user = await get_user_by_email(email=activation_data.email, db=db)
+    if not db_user:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A user with this email {activation_data.email} not found."
+        )
+
+    return await activate_user(
+        user=db_user,
+        activation_token=activation_data.token,
+        db=db
+    )

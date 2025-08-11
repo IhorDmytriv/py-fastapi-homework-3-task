@@ -26,3 +26,17 @@ class UserRegistrationResponseSchema(UserBaseSchema):
 
     class Config:
         from_attributes = True
+
+
+class UserActivationRequestSchema(BaseModel):
+    email: EmailStr
+    token: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return accounts_validators.validate_email(user_email=value)
+
+
+class MessageResponseSchema(BaseModel):
+    message: str
