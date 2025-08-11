@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import cast
 
 from fastapi import HTTPException
@@ -51,7 +52,12 @@ async def get_user_by_email(email: EmailStr, db: AsyncSession):
 
 
 async def activate_user(user: UserModel, activation_token: str, db: AsyncSession) -> dict:
+    if user.is_active:
+        raise HTTPException(status_code=400, detail="User account is already active.")
+
     user_token_model = user.activation_token
+    if not user_token_model or user_token_model.expires_at < datetime.now():
+        raise HTTPException(status_code=400, detail="Invalid or expired activation token.")
     if user_token_model.token != activation_token:
         raise HTTPException(status_code=401)
 
