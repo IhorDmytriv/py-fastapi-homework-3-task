@@ -4,6 +4,7 @@ from typing import cast
 from fastapi import HTTPException
 from pydantic import EmailStr
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -35,7 +36,7 @@ async def create_user(user: UserRegistrationRequestSchema, db: AsyncSession):
 
         return db_user
 
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="An error occurred during user creation.")
 
@@ -80,3 +81,27 @@ async def reset_request_user_password(user: UserModel, db: AsyncSession):
         await db.commit()
 
     return {"message": "If you are registered, you will receive an email with instructions."}
+
+
+async def reset_completion_user_password(user: UserModel, new_password: str, token: str, db: AsyncSession):
+    user_token_model = user.password_reset_token
+    if not user_token_model:
+        raise HTTPException(status_code=400, detail="Invalid email or token.")
+
+    if user_token_model.expires_at < datetime.now() or user_token_model.token != token:
+        await db.delete(user_token_model)
+        await db.commit()
+        raise HTTPException(status_code=400, detail="Invalid email or token.")
+
+    hashed = hash_password(new_password)
+    user._hashed_password = hashed
+
+    try:
+        await db.delete(user_token_model)
+        await db.commit()
+
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="An error occurred while resetting the password.")
+
+    return {"message": "Password reset successfully."}

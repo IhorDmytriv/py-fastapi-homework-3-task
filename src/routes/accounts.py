@@ -1,30 +1,24 @@
-from datetime import datetime, timezone
-from typing import cast
-
 from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy import select, delete
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session, joinedload
 
 from config import get_jwt_auth_manager, get_settings, BaseAppSettings
-from crud.user_crud import create_user, get_user_by_email, activate_user, reset_request_user_password
-from database import (
-    get_db,
-    UserModel,
-    UserGroupModel,
-    UserGroupEnum,
-    ActivationTokenModel,
-    PasswordResetTokenModel,
-    RefreshTokenModel
+from crud.user_crud import (
+    create_user,
+    get_user_by_email,
+    activate_user,
+    reset_request_user_password,
+    reset_completion_user_password
 )
+from database import get_db
+
 from exceptions import BaseSecurityError
 from schemas import (
     UserRegistrationResponseSchema,
     UserRegistrationRequestSchema,
     UserActivationRequestSchema,
     MessageResponseSchema,
-    PasswordResetRequestSchema
+    PasswordResetRequestSchema,
+    PasswordResetCompleteRequestSchema
 )
 from security.interfaces import JWTAuthManagerInterface
 
@@ -69,3 +63,17 @@ async def password_reset_request(user_data: PasswordResetRequestSchema, db: Asyn
     db_user = await get_user_by_email(email=user_data.email, db=db)
 
     return await reset_request_user_password(user=db_user, db=db)
+
+
+@router.post("/reset-password/complete/", status_code=200, response_model=MessageResponseSchema)
+async def password_reset_complete(user_data: PasswordResetCompleteRequestSchema, db: AsyncSession = Depends(get_db)):
+    db_user = await get_user_by_email(email=user_data.email, db=db)
+    if not db_user or not db_user.is_active:
+        raise HTTPException(status_code=400, detail="Invalid email or token.")
+
+    return await reset_completion_user_password(
+        user=db_user,
+        new_password=user_data.password,
+        token=user_data.token,
+        db=db
+    )
