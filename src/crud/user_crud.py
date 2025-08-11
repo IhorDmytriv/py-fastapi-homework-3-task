@@ -5,7 +5,7 @@ from pydantic import EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import UserModel, UserGroupModel, UserGroupEnum
+from database import UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel
 from schemas import UserRegistrationRequestSchema
 from security.passwords import hash_password
 
@@ -25,8 +25,12 @@ async def create_user(user: UserRegistrationRequestSchema, db: AsyncSession):
             group_id=default_group_id,
         )
         db.add(db_user)
+        await db.flush()
+
+        activation_token = ActivationTokenModel(user_id=db_user.id)
+        db.add(activation_token)
         await db.commit()
-        await db.refresh(db_user)
+
         return db_user
 
     except Exception:
