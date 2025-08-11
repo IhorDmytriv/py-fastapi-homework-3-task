@@ -38,7 +38,7 @@ async def register_user(user_data: UserRegistrationRequestSchema, db: AsyncSessi
             detail=f"A user with this email {user_data.email} already exists."
         )
 
-    new_user = await create_user(user=user_data, db=db)
+    new_user = await create_user(user_data=user_data, db=db)
     return new_user
 
 

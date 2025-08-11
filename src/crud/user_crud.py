@@ -10,10 +10,9 @@ from sqlalchemy.orm import joinedload
 
 from database import UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, PasswordResetTokenModel
 from schemas import UserRegistrationRequestSchema
-from security.passwords import hash_password
 
 
-async def create_user(user: UserRegistrationRequestSchema, db: AsyncSession):
+async def create_user(user_data: UserRegistrationRequestSchema, db: AsyncSession):
     try:
         result = await db.execute(
             select(UserGroupModel.id)
@@ -21,11 +20,10 @@ async def create_user(user: UserRegistrationRequestSchema, db: AsyncSession):
         )
         default_group_id = result.scalar_one_or_none()
 
-        hashed = hash_password(user.password)
-        db_user = UserModel(
-            email=cast(str, user.email),
-            _hashed_password=hashed,
-            group_id=default_group_id,
+        db_user = UserModel.create(
+            email=cast(str, user_data.email),
+            raw_password=user_data.password,
+            group_id=default_group_id
         )
         db.add(db_user)
         await db.flush()
@@ -93,8 +91,7 @@ async def reset_completion_user_password(user: UserModel, new_password: str, tok
         await db.commit()
         raise HTTPException(status_code=400, detail="Invalid email or token.")
 
-    hashed = hash_password(new_password)
-    user._hashed_password = hashed
+    user.password = new_password
 
     try:
         await db.delete(user_token_model)
