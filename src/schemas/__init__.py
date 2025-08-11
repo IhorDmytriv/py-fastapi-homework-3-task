@@ -10,6 +10,7 @@ from schemas.accounts import (
     UserRegistrationResponseSchema,
     UserActivationRequestSchema,
     MessageResponseSchema,
+    UserBaseSchema,
     # PasswordResetRequestSchema,
     # PasswordResetCompleteRequestSchema,
     # UserLoginResponseSchema,

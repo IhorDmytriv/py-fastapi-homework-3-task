@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from database import UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel
+from database import UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, PasswordResetTokenModel
 from schemas import UserRegistrationRequestSchema
 from security.passwords import hash_password
 
@@ -45,6 +45,7 @@ async def get_user_by_email(email: EmailStr, db: AsyncSession):
         select(UserModel)
         .options(
             joinedload(UserModel.activation_token),
+            joinedload(UserModel.password_reset_token)
         )
         .where(UserModel.email == email)
     )
@@ -65,3 +66,17 @@ async def activate_user(user: UserModel, activation_token: str, db: AsyncSession
     await db.delete(user_token_model)
     await db.commit()
     return {"message": "User account activated successfully."}
+
+
+async def reset_request_user_password(user: UserModel, db: AsyncSession):
+    if user and user.is_active:
+
+        if user.password_reset_token:
+            await db.delete(user.password_reset_token)
+            await db.flush()
+
+        password_reset_token = PasswordResetTokenModel(user_id=user.id)
+        db.add(password_reset_token)
+        await db.commit()
+
+    return {"message": "If you are registered, you will receive an email with instructions."}
