@@ -112,6 +112,7 @@ async def reset_completion_user_password(user: UserModel, new_password: str, tok
         await db.commit()
         raise HTTPException(status_code=400, detail="Invalid email or token.")
 
+    # UserModel.password setter automatically hashes passwords before storing.
     user.password = new_password
 
     try:
