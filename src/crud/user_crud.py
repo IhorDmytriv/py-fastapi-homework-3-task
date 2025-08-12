@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import cast
 
 from fastapi import HTTPException
@@ -66,7 +66,14 @@ async def activate_user(user: UserModel, activation_token: str, db: AsyncSession
         raise HTTPException(status_code=400, detail="User account is already active.")
 
     user_token_model = user.activation_token
-    if not user_token_model or user_token_model.expires_at < datetime.now():
+    if not user_token_model:
+        raise HTTPException(status_code=400, detail="Invalid or expired activation token.")
+
+    token_expires_at = user_token_model.expires_at
+    if token_expires_at.tzinfo is None:
+        token_expires_at = token_expires_at.replace(tzinfo=timezone.utc)
+
+    if token_expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Invalid or expired activation token.")
     if user_token_model.token != activation_token:
         raise HTTPException(status_code=401)
@@ -96,7 +103,11 @@ async def reset_completion_user_password(user: UserModel, new_password: str, tok
     if not user_token_model:
         raise HTTPException(status_code=400, detail="Invalid email or token.")
 
-    if user_token_model.expires_at < datetime.now() or user_token_model.token != token:
+    token_expires_at = user_token_model.expires_at
+    if token_expires_at.tzinfo is None:
+        token_expires_at = token_expires_at.replace(tzinfo=timezone.utc)
+
+    if token_expires_at < datetime.now(timezone.utc) or user_token_model.token != token:
         await db.delete(user_token_model)
         await db.commit()
         raise HTTPException(status_code=400, detail="Invalid email or token.")
