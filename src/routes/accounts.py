@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_jwt_auth_manager, get_settings, BaseAppSettings
@@ -7,7 +7,8 @@ from crud.user_crud import (
     get_user_by_email,
     activate_user,
     reset_request_user_password,
-    reset_completion_user_password
+    reset_completion_user_password,
+    create_user_access_and_refresh_tokens
 )
 from database import get_db
 
@@ -19,6 +20,9 @@ from schemas import (
     MessageResponseSchema,
     PasswordResetRequestSchema,
     PasswordResetCompleteRequestSchema
+    PasswordResetCompleteRequestSchema,
+    UserLoginResponseSchema,
+    UserLoginRequestSchema,
 )
 from security.interfaces import JWTAuthManagerInterface
 
@@ -76,4 +80,26 @@ async def password_reset_complete(user_data: PasswordResetCompleteRequestSchema,
         new_password=user_data.password,
         token=user_data.token,
         db=db
+    )
+
+
+@router.post("/login/", status_code=201, response_model=UserLoginResponseSchema)
+async def login_user(
+        login_data: UserLoginRequestSchema,
+        db: AsyncSession = Depends(get_db),
+        jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+        settings: BaseAppSettings = Depends(get_settings)
+):
+    db_user = await get_user_by_email(email=login_data.email, db=db)
+    if not db_user:
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+    if not db_user.is_active:
+        raise HTTPException(status_code=403, detail="User account is not activated.")
+
+    return await create_user_access_and_refresh_tokens(
+        user=db_user,
+        login_password=login_data.password,
+        db=db,
+        jwt_manager=jwt_manager,
+        settings=settings
     )

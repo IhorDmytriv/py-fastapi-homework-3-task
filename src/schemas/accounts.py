@@ -59,3 +59,13 @@ class PasswordResetCompleteRequestSchema(PasswordResetRequestSchema):
     @classmethod
     def validate_password(cls, value: str) -> str:
         return accounts_validators.validate_password_strength(password=value)
+
+
+class UserLoginResponseSchema(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+
+
+class UserLoginRequestSchema(UserRegistrationRequestSchema):
+    pass

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import cast
 
 from fastapi import HTTPException
@@ -8,7 +8,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from database import UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, PasswordResetTokenModel
+from config import BaseAppSettings
+from security.interfaces import JWTAuthManagerInterface
+from database import (
+    UserModel,
+    UserGroupModel,
+    UserGroupEnum,
+    ActivationTokenModel,
+    PasswordResetTokenModel,
+    RefreshTokenModel
+)
 from schemas import UserRegistrationRequestSchema
 
 
@@ -102,3 +111,43 @@ async def reset_completion_user_password(user: UserModel, new_password: str, tok
         raise HTTPException(status_code=500, detail="An error occurred while resetting the password.")
 
     return {"message": "Password reset successfully."}
+
+
+async def create_user_access_and_refresh_tokens(
+        user: UserModel,
+        login_password: str,
+        db: AsyncSession,
+        jwt_manager: JWTAuthManagerInterface,
+        settings: BaseAppSettings
+):
+    if not user.verify_password(login_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    user_sub_data = {"sub": user.email, "user_id": user.id}
+
+    access_token = jwt_manager.create_access_token(
+        data=user_sub_data
+    )
+    refresh_token = jwt_manager.create_refresh_token(
+        data=user_sub_data,
+        expires_delta=timedelta(days=settings.LOGIN_TIME_DAYS)
+    )
+
+    refresh_token_model = RefreshTokenModel.create(
+        user_id=user.id,
+        days_valid=settings.LOGIN_TIME_DAYS,
+        token=refresh_token
+    )
+
+    try:
+        db.add(refresh_token_model)
+        await db.commit()
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="An error occurred while processing the request.")
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+    }
