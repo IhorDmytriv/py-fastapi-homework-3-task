@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from config import BaseAppSettings
+from exceptions import BaseSecurityError
 from security.interfaces import JWTAuthManagerInterface
 from database import (
     UserModel,
@@ -151,3 +152,33 @@ async def create_user_access_and_refresh_tokens(
         "refresh_token": refresh_token,
         "token_type": "bearer",
     }
+
+
+async def create_new_user_access_token(
+    refresh_token : str,
+    db: AsyncSession,
+    jwt_manager: JWTAuthManagerInterface,
+):
+    try:
+        refresh_token_data = jwt_manager.decode_refresh_token(refresh_token)
+    except BaseSecurityError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+    result = await db.execute(select(RefreshTokenModel).where(RefreshTokenModel.token == refresh_token))
+    db_refresh_token_model = result.scalar_one_or_none()
+
+    if not db_refresh_token_model:
+        raise HTTPException(status_code=401, detail="Refresh token not found.")
+
+    user_id_from_token_data = refresh_token_data.get("user_id", None)
+    result = await db.execute(select(UserModel).where(UserModel.id == user_id_from_token_data))
+    db_user = result.scalar_one_or_none()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    access_token = jwt_manager.create_access_token(
+        data=refresh_token_data
+    )
+
+    return {"access_token": access_token}

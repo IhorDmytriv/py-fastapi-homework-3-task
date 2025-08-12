@@ -8,7 +8,8 @@ from crud.user_crud import (
     activate_user,
     reset_request_user_password,
     reset_completion_user_password,
-    create_user_access_and_refresh_tokens
+    create_user_access_and_refresh_tokens,
+    create_new_user_access_token
 )
 from database import get_db
 
@@ -19,10 +20,11 @@ from schemas import (
     UserActivationRequestSchema,
     MessageResponseSchema,
     PasswordResetRequestSchema,
-    PasswordResetCompleteRequestSchema
     PasswordResetCompleteRequestSchema,
     UserLoginResponseSchema,
     UserLoginRequestSchema,
+    TokenRefreshRequestSchema,
+    TokenRefreshResponseSchema
 )
 from security.interfaces import JWTAuthManagerInterface
 
@@ -102,4 +104,17 @@ async def login_user(
         db=db,
         jwt_manager=jwt_manager,
         settings=settings
+    )
+
+
+@router.post("/refresh/", status_code=200, response_model=TokenRefreshResponseSchema)
+async def refresh_user_access_token(
+        refresh_token_request_data: TokenRefreshRequestSchema,
+        db: AsyncSession = Depends(get_db),
+        jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager)
+):
+    return await create_new_user_access_token(
+        refresh_token=refresh_token_request_data.refresh_token,
+        db=db,
+        jwt_manager=jwt_manager,
     )
