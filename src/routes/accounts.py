@@ -53,7 +53,7 @@ async def activate_account(activation_data: UserActivationRequestSchema, db: Asy
     db_user = await get_user_by_email(email=activation_data.email, db=db)
     if not db_user:
         raise HTTPException(
-            status_code=409,
+            status_code=400,
             detail=f"A user with this email {activation_data.email} not found."
         )
 
